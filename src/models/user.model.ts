@@ -1,4 +1,5 @@
-import {Entity, model, property} from '@loopback/repository';
+import {Entity, hasMany, model, property} from '@loopback/repository';
+import {Blog} from './blog.model';
 
 @model()
 export class User extends Entity {
@@ -96,6 +97,9 @@ export class User extends Entity {
     defaultFn: 'now',
   })
   updatedAt?: string;
+
+  @hasMany(() => Blog, {keyTo: 'authorId'})
+  blogs: Blog[];
 
   constructor(data?: Partial<User>) {
     super(data);
