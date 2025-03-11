@@ -7,24 +7,28 @@ import {
   Where,
 } from '@loopback/repository';
 import {
-  post,
-  param,
+  del,
   get,
   getModelSchemaRef,
+  param,
   patch,
+  post,
   put,
-  del,
   requestBody,
   response,
 } from '@loopback/rest';
 import {User} from '../models';
 import {UserRepository} from '../repositories';
 
+import {inject} from '@loopback/core';
+import {v4 as uuidv4} from 'uuid';
+import {EmailService} from '../services';
+
 export class UserController {
   constructor(
-    @repository(UserRepository)
-    public userRepository : UserRepository,
-  ) {}
+    @repository(UserRepository) public userRepository: UserRepository,
+    @inject('services.EmailService') private emailService: EmailService,
+  ) { }
 
   @post('/users')
   @response(200, {
@@ -44,7 +48,32 @@ export class UserController {
     })
     user: Omit<User, 'id'>,
   ): Promise<User> {
-    return this.userRepository.create(user);
+
+    const existingUser = await this.userRepository.findOne({where: {email: user.email}});
+    if (existingUser) {
+      throw new Error('Email already in use');
+    }
+
+    const verificationToken = uuidv4(); // Generate unique token
+    user.verificationToken = verificationToken;
+    const newUser = await this.userRepository.create(user);
+    await this.emailService.sendVerificationEmail(newUser.email, verificationToken);
+    // newUser['message'] = 'Registration successful! Please verify your email.'
+    return newUser;
+  }
+
+  // GET /verify-email?token=your_generated_token
+  @get('/verify-email')
+  async verifyEmail(@param.query.string('token') token: string): Promise<object> {
+    const user = await this.userRepository.findOne({where: {verificationToken: token}});
+
+    if (!user) {
+      return {error: 'Invalid or expired token'};
+    }
+
+    await this.userRepository.updateById(user.id, {emailVerified: true, verificationToken: 'null'});
+
+    return {message: 'Email successfully verified! You can now log in.'};
   }
 
   @get('/users/count')
