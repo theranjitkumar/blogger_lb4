@@ -98,7 +98,7 @@ export class UserController {
       return {error: 'Invalid or expired token'};
     }
 
-    await this.userRepository.updateById(user.id, {emailVerified: true, verificationToken: 'null'});
+    await this.userRepository.updateById(user.id, {emailVerified: true, verificationToken: ''});
 
     return {status: 'success', message: 'Email successfully verified! You can now log in.'};
   }
