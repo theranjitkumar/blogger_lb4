@@ -1,11 +1,13 @@
-import {injectable} from '@loopback/core';
+import {inject, injectable} from '@loopback/core';
 import nodemailer from 'nodemailer';
+import {ConfigService} from '../services';
 
 @injectable()
 export class EmailService {
   private transporter;
 
-  constructor() {
+  constructor(
+    @inject('services.ConfigService') private configService: ConfigService) {
     this.transporter = nodemailer.createTransport({
       service: process.env.EMAIL_HOST, // Use your email service provider
       auth: {
@@ -16,7 +18,7 @@ export class EmailService {
   }
 
   async sendVerificationEmail(email: string, token: string): Promise<void> {
-    const verificationLink = `http://localhost:3000/verify-email?token=${token}`;
+    const verificationLink = `${this.configService.getBaseUrl()}/verify-email?token=${token}`;
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
