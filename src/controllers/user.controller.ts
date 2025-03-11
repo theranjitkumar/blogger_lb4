@@ -15,7 +15,9 @@ import {
   post,
   put,
   requestBody,
+  Response,
   response,
+  RestBindings,
 } from '@loopback/rest';
 import {User} from '../models';
 import {UserRepository} from '../repositories';
@@ -26,14 +28,25 @@ import {EmailService} from '../services';
 
 export class UserController {
   constructor(
+    @inject(RestBindings.Http.RESPONSE) private response: Response,
     @repository(UserRepository) public userRepository: UserRepository,
     @inject('services.EmailService') private emailService: EmailService,
   ) { }
 
   @post('/users')
-  @response(200, {
-    description: 'User model instance',
-    content: {'application/json': {schema: getModelSchemaRef(User)}},
+  @response(201, {
+    description: 'User registration response',
+    content: {
+      'application/json': {
+        schema: {
+          type: 'object',
+          properties: {
+            status: {type: 'string'},
+            message: {type: 'string'},
+          },
+        },
+      },
+    },
   })
   async create(
     @requestBody({
@@ -47,19 +60,33 @@ export class UserController {
       },
     })
     user: Omit<User, 'id'>,
-  ): Promise<User> {
+  ): Promise<object> {
 
+    // Check if email already exists
     const existingUser = await this.userRepository.findOne({where: {email: user.email}});
     if (existingUser) {
-      throw new Error('Email already in use');
+      return {status: 'error', message: 'Email already in use'}; // Consistent response format
     }
 
-    const verificationToken = uuidv4(); // Generate unique token
+    // Generate verification token
+    const verificationToken = uuidv4();
     user.verificationToken = verificationToken;
+
+    // Create new user
     const newUser = await this.userRepository.create(user);
-    await this.emailService.sendVerificationEmail(newUser.email, verificationToken);
-    // newUser['message'] = 'Registration successful! Please verify your email.'
-    return newUser;
+
+    // Attempt to send verification email
+    let status = 'success';
+    let message = 'Registration successful! Please verify your email.';
+    try {
+      await this.emailService.sendVerificationEmail(newUser.email, verificationToken);
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      status = 'warning';
+      message = 'Registration successful, but email verification failed. Please request a new verification email.';
+    }
+
+    return {status, message};
   }
 
   // GET /verify-email?token=your_generated_token
@@ -73,7 +100,7 @@ export class UserController {
 
     await this.userRepository.updateById(user.id, {emailVerified: true, verificationToken: 'null'});
 
-    return {message: 'Email successfully verified! You can now log in.'};
+    return {status: 'success', message: 'Email successfully verified! You can now log in.'};
   }
 
   @get('/users/count')
