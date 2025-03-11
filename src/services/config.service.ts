@@ -6,7 +6,10 @@ dotenv.config();
 
 @injectable({scope: BindingScope.TRANSIENT})
 export class ConfigService {
-  constructor(@inject(RestBindings.Http.REQUEST) private request: Request,) { }
+
+  constructor(@inject(RestBindings.Http.REQUEST) private request: Request,) {
+
+  }
 
   getBaseUrl(): string {
     return `${this.request.protocol}://${this.request.get('host')}`;
